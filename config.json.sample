@@ -36,6 +36,7 @@
   ],
   "ntfy": {
     "enable": false,
-    "topic": "YOUR-OWN-TOPIC"
+    "topic": "YOUR-OWN-TOPIC",
+    "title": "Paris Tennis"
   }
 }
