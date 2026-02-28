@@ -69,7 +69,7 @@ const bookTennis = async () => {
         await page.goto('https://tennis.paris.fr/tennis/jsp/site/Portal.jsp?page=recherche&view=recherche_creneau#!')
 
         // select tennis location
-        await page.locator('.tokens-input-text').pressSequentially(`${location} `)
+        await page.locator('.tokens-input-text').pressSequentially(`${location} `, { delay: 40 })
         await page.waitForSelector(`.tokens-suggestions-list-element >> text="${location}"`)
         await page.click(`.tokens-suggestions-list-element >> text="${location}"`)
 
@@ -195,6 +195,7 @@ const bookTennis = async () => {
               `Confirmation pour le ${date.format('DD/MM/YYYY')} - ${hour}h`, {
               domain: config?.ntfy?.domain || process.env.NTFY_DOMAIN,
               topic: config?.ntfy?.topic || process.env.NTFY_TOPIC,
+              title: config?.ntfy?.title
             })
           }
         })
@@ -206,6 +207,7 @@ const bookTennis = async () => {
         await notify(null, null, 'Aucun creneau disponible pour aujourd\'hui.', {
           domain: config?.ntfy?.domain || process.env.NTFY_DOMAIN,
           topic: config?.ntfy?.topic || process.env.NTFY_TOPIC,
+          title: config?.ntfy?.title
         })
       }
     } catch (e) {
@@ -216,6 +218,7 @@ const bookTennis = async () => {
         await notify(screenshot, 'failure.png', 'Erreur lors de l\'execution du programme.', {
           domain: config?.ntfy?.domain || process.env.NTFY_DOMAIN,
           topic: config?.ntfy?.topic || process.env.NTFY_TOPIC,
+          title: config?.ntfy?.title
         })
       }
     }
