@@ -2,3 +2,12 @@ node_modules/
 config.json
 img/
 *.ics
+
+# macOS
+.DS_Store
+._*
+
+# Fichiers temporaires
+out.json
+logs_b64.txt
+out/
