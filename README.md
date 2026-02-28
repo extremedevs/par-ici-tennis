@@ -157,9 +157,12 @@ docker run --rm -p 7000:8080 \
   -v "$(pwd -W)/out:/var/task/out" \
   -v "$(pwd -W)/img:/var/task/img" \
   -e HEADLESS=true \
+  -e SKIP_WAIT=true \
   --shm-size=1g \
   par-ici-tennis:lambda-local
 ```
+
+> `SKIP_WAIT=true` bypasses the 8:00 AM wait — useful for local tests. Remove it in production.
 
 Then invoke in a second terminal:
 ```sh
@@ -219,7 +222,7 @@ MSYS_NO_PATHCONV=1 aws lambda create-function \
   --code ImageUri=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$REPO:latest \
   --role arn:aws:iam::<ACCOUNT_ID>:role/par-ici-tennis-lambda-role \
   --architectures arm64 \
-  --timeout 120 \
+  --timeout 180 \
   --memory-size 1536 \
   --region $AWS_REGION
 
@@ -229,26 +232,24 @@ MSYS_NO_PATHCONV=1 aws lambda update-function-configuration \
   --region $AWS_REGION
 ```
 
-##### 6. Schedule with EventBridge
+##### 6. Schedule with EventBridge Scheduler
 
+**EventBridge Scheduler** (not EventBridge Rules) is used here because it supports native timezone scheduling — no UTC conversion needed, DST handled automatically.
+
+The Lambda is triggered at **7:59 AM Paris time** (1 minute early). The handler waits internally until exactly **8:00:00 AM** before running the booking.
+
+First, create an IAM role `par-ici-tennis-scheduler-role` in the AWS Console with:
+- Trust policy principal: `scheduler.amazonaws.com`
+- Inline permission: `lambda:InvokeFunction` on `arn:aws:lambda:eu-west-3:<ACCOUNT_ID>:function:par-ici-tennis`
+
+Then create the schedule:
 ```sh
-# Trigger every day at 06:00 UTC (08:00 Paris time)
-MSYS_NO_PATHCONV=1 aws events put-rule \
+MSYS_NO_PATHCONV=1 aws scheduler create-schedule \
   --name par-ici-tennis-everyday \
-  --schedule-expression "cron(0 6 * * ? *)" \
-  --region $AWS_REGION
-
-MSYS_NO_PATHCONV=1 aws lambda add-permission \
-  --function-name par-ici-tennis \
-  --statement-id eventbridge-invoke \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn arn:aws:events:${AWS_REGION}:${ACCOUNT_ID}:rule/par-ici-tennis-everyday \
-  --region $AWS_REGION
-
-MSYS_NO_PATHCONV=1 aws events put-targets \
-  --rule par-ici-tennis-everyday \
-  --targets "Id"="1","Arn"="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:par-ici-tennis" \
+  --schedule-expression "cron(59 7 * * ? *)" \
+  --schedule-expression-timezone "Europe/Paris" \
+  --flexible-time-window Mode=OFF \
+  --target "Arn=arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:par-ici-tennis,RoleArn=arn:aws:iam::${ACCOUNT_ID}:role/par-ici-tennis-scheduler-role" \
   --region $AWS_REGION
 ```
 
@@ -269,9 +270,9 @@ MSYS_NO_PATHCONV=1 aws lambda update-function-code \
 
 | Config | Cost/run | Cost/month (1×/day) |
 |---|---|---|
-| 1536 MB, ~50s | ~$0.001 | ~$0.03 |
+| 1536 MB, ~110s (60s wait + ~50s booking) | ~$0.003 | ~$0.08 |
 
-> Runs within the AWS Lambda free tier (400,000 GB-seconds/month).
+> Runs within the AWS Lambda free tier (400,000 GB-seconds/month) — effective cost: **$0**.
 
 ## License
 
