@@ -1,4 +1,4 @@
--- À exécuter dans Supabase → SQL Editor
+-- Appliquée automatiquement par l’intégration GitHub de Supabase (ou à coller dans SQL Editor)
 
 create table if not exists runs (
   id uuid primary key default gen_random_uuid(),
