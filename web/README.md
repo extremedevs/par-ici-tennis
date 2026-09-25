@@ -11,7 +11,9 @@ EventBridge Scheduler → Lambda (index.js) ──ntfy──▶ téléphone
 ## 1. Supabase
 
 1. Créer un projet sur [supabase.com](https://supabase.com) (offre gratuite).
-2. SQL Editor → coller et exécuter [`supabase/migrations/0001_runs.sql`](supabase/migrations/0001_runs.sql).
+2. Créer la table, au choix :
+   - Integrations → GitHub : **Working directory = `web`**, cocher « Deploy to production » (branche `main`). Les migrations de `supabase/migrations` sont appliquées à chaque push.
+   - Ou SQL Editor → coller et exécuter [`supabase/migrations/20260925000000_runs.sql`](supabase/migrations/20260925000000_runs.sql).
 3. Project Settings → API : noter l'URL du projet et la clé `service_role`.
 
 ## 2. Vercel
