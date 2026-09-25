@@ -12,7 +12,7 @@ EventBridge Scheduler → Lambda (index.js) ──ntfy──▶ téléphone
 
 1. Créer un projet sur [supabase.com](https://supabase.com) (offre gratuite).
 2. Créer la table, au choix :
-   - Integrations → GitHub : **Working directory = `web`**, cocher « Deploy to production » (branche `main`). Les migrations de `supabase/migrations` sont appliquées à chaque push.
+   - Integrations → GitHub : **Working directory = `web`**, cocher « Deploy to production » (branche `main`). Les migrations de `supabase/migrations` sont appliquées au **prochain push sur `main`** (sauvegarder le réglage ne déclenche rien).
    - Ou SQL Editor → coller et exécuter [`supabase/migrations/20260925000000_runs.sql`](supabase/migrations/20260925000000_runs.sql).
 3. Project Settings → API : noter l'URL du projet et la clé `service_role`.
 
