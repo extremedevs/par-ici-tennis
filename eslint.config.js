@@ -18,7 +18,7 @@ export default [
     }
   },
   {
-    ignores: ['staticFiles.js']
+    ignores: ['staticFiles.js', 'web/**']
   },
   pluginJs.configs.recommended,
 ]
