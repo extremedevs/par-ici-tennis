@@ -27,16 +27,21 @@ export async function POST(request) {
   }
   const hour = Number.parseInt(payload.hour, 10)
 
-  await must(db().from('runs').insert({
-    account,
-    status: payload.status,
-    target_date: /^\d{4}-\d{2}-\d{2}$/.test(payload.date) ? payload.date : null,
-    hour: hour >= 0 && hour <= 23 ? hour : null,
-    location: text(payload.location),
-    court: text(payload.court),
-    address: text(payload.address),
-    message: text(payload.message, 2000),
-  }))
+  try {
+    await must(db().from('runs').insert({
+      account,
+      status: payload.status,
+      target_date: /^\d{4}-\d{2}-\d{2}$/.test(payload.date) ? payload.date : null,
+      hour: hour >= 0 && hour <= 23 ? hour : null,
+      location: text(payload.location),
+      court: text(payload.court),
+      address: text(payload.address),
+      message: text(payload.message, 2000),
+    }))
+  } catch (err) {
+    // Caller is authenticated, so expose the cause to ease setup
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 
   return new NextResponse(null, { status: 201 })
 }
