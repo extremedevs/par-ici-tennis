@@ -94,6 +94,10 @@ Options:
 
 ![Notification example](doc/ntfy.png)
 
+### Dashboard (optional)
+
+The [`web/`](web/README.md) folder contains a small Next.js app (Vercel + Supabase) showing, for each account, whether today's booking succeeded. Set `TRACKER_URL` and `TRACKER_TOKEN` on the Lambda to enable it. The account is identified by `name` in the config (or `ntfy.title`).
+
 ### Payment process
 
 To pass the payment phase you need a "carnet de réservation". Make sure it matches your `priceType` & `courtType` [combination](https://tennis.paris.fr/tennis/jsp/site/Portal.jsp?page=rate&view=les_tarifs).
