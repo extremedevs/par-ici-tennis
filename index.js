@@ -18,6 +18,10 @@ const bookTennis = async () => {
 
   console.log(`${dayjs().format()} - Starting searching tennis`)
 
+  const date = config.date ? dayjs(config.date, 'D/MM/YYYY') : dayjs().add(6, 'days')
+  // Sent once to the dashboard at the end of the run
+  const result = { status: 'not_found', date: date.format('YYYY-MM-DD') }
+
   const browser = await chromium.launch({
     headless: process.env.HEADLESS !== 'false', // bascule par ENV
     slowMo: process.env.SLOWMO ? Number(process.env.SLOWMO) : 0,
@@ -61,11 +65,8 @@ const bookTennis = async () => {
     // wait for login redirection before continue
     await page.waitForSelector('.main-informations')
 
-    const date = config.date ? dayjs(config.date, 'D/MM/YYYY') : dayjs().add(6, 'days')
     try {
       const locations = !Array.isArray(config.locations) ? Object.keys(config.locations) : config.locations
-      let reserved = false
-      let dryRunFound = false
       locationsLoop:
       for (const location of locations) {
         console.log(`${dayjs().format()} - Search at ${location}`)
@@ -154,8 +155,7 @@ const bookTennis = async () => {
           await page.click('#previous')
           await page.click('#btnCancelBooking')
 
-          dryRunFound = true
-          await report({ status: 'dry_run', date: date.format('YYYY-MM-DD'), hour: Number(selectedHour), location })
+          Object.assign(result, { status: 'dry_run', hour: Number(selectedHour), location })
           break locationsLoop
         }
 
@@ -177,7 +177,7 @@ const bookTennis = async () => {
         const [day, month, year] = [date.date(), date.month() + 1, date.year()]
         const hourMatch = dateStr.match(/(\d{2})h/)
         const hour = hourMatch ? Number(hourMatch[1]) : 12
-        await report({ status: 'booked', date: date.format('YYYY-MM-DD'), hour, location, court, address })
+        Object.assign(result, { status: 'booked', hour: Number(selectedHour), location, court, address })
         const start = [year, month, day, hour, 0]
         const duration = { hours: 1, minutes: 0 }
         const event = {
@@ -204,15 +204,10 @@ const bookTennis = async () => {
             })
           }
         })
-        reserved = true
         break
       }
 
-      if (!reserved && !dryRunFound) {
-        await report({ status: 'not_found', date: date.format('YYYY-MM-DD') })
-      }
-
-      if (!reserved && (config.ntfy?.enable === true || process.env.NTFY_TOPIC)) {
+      if (result.status === 'not_found' && (config.ntfy?.enable === true || process.env.NTFY_TOPIC)) {
         await notify(null, null, 'Aucun creneau disponible pour aujourd\'hui.', {
           domain: config?.ntfy?.domain || process.env.NTFY_DOMAIN,
           topic: config?.ntfy?.topic || process.env.NTFY_TOPIC,
@@ -221,7 +216,7 @@ const bookTennis = async () => {
       }
     } catch (e) {
       console.log(e)
-      await report({ status: 'error', date: date.format('YYYY-MM-DD'), message: String(e?.message || e) })
+      Object.assign(result, { status: 'error', message: String(e?.message || e) })
       const screenshot = await page.screenshot({ path: `${process.env.IMG_DIR ?? 'img'}/failure.png` })
 
       if (config.ntfy?.enable === true || process.env.NTFY_TOPIC) {
@@ -235,7 +230,7 @@ const bookTennis = async () => {
 
   } catch (e) {
     console.log('ERROR:', e)
-    await report({ status: 'error', message: String(e?.message || e) })
+    Object.assign(result, { status: 'error', message: String(e?.message || e) })
     await page.screenshot({ path: `${process.env.IMG_DIR ?? 'img'}/failure.png` })
   }
   finally {
@@ -249,8 +244,10 @@ const bookTennis = async () => {
     }
 
     await browser.close()
+    await report(result)
   }
 
+  return result
 }
 
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {

@@ -12,7 +12,7 @@ create table if not exists runs (
   address text,
   message text
 );
-create index if not exists runs_account_created_at_idx on runs (account, created_at desc);
+create index if not exists runs_created_at_idx on runs (created_at desc);
 
 -- L'app utilise uniquement la clé service_role côté serveur :
 -- RLS sans politique bloque tout accès via la clé anon.

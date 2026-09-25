@@ -4,13 +4,20 @@ export const SESSION_COOKIE = 'pit_session'
 
 const toHex = (buffer) => Array.from(new Uint8Array(buffer), (b) => b.toString(16).padStart(2, '0')).join('')
 
-// Session cookie value = HMAC(APP_PASSWORD), changing the password logs everyone out
-export async function sessionToken() {
+async function computeSessionToken() {
   const secret = process.env.APP_PASSWORD
   if (!secret) return null
   const encoder = new TextEncoder()
   const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return toHex(await crypto.subtle.sign('HMAC', key, encoder.encode('par-ici-tennis-session')))
+}
+
+let tokenPromise
+
+// Session cookie value = HMAC(APP_PASSWORD), changing the password logs everyone out.
+// APP_PASSWORD is fixed per deployment, so compute it once per instance.
+export function sessionToken() {
+  return (tokenPromise ??= computeSessionToken())
 }
 
 export function safeEqual(a, b) {
@@ -21,8 +28,7 @@ export function safeEqual(a, b) {
 }
 
 export async function isValidSession(value) {
-  const expected = await sessionToken()
-  return Boolean(expected) && safeEqual(value, expected)
+  return safeEqual(value, await sessionToken())
 }
 
 export function bearerMatches(request, secret) {

@@ -1,15 +1,9 @@
 import { db, must } from '@/lib/supabase'
 import { formatDate, formatDateTime, parisDate } from '@/lib/dates'
+import { STATUS } from '@/lib/status'
 import { logout } from './actions'
 
 export const dynamic = 'force-dynamic'
-
-const STATUS = {
-  booked: { icon: '✅', label: 'Réservé', className: 'ok' },
-  dry_run: { icon: '🧪', label: 'Dry-run OK', className: 'info' },
-  not_found: { icon: '😕', label: 'Aucun créneau', className: 'warn' },
-  error: { icon: '⚠️', label: 'Erreur', className: 'danger' },
-}
 
 function slot(run) {
   return [
@@ -23,7 +17,11 @@ function slot(run) {
 export default async function Home() {
   const today = parisDate()
   const since = new Date(Date.now() - 30 * 86400000).toISOString()
-  const runs = await must(db().from('runs').select('*').gte('created_at', since).order('created_at', { ascending: false }))
+  const runs = await must(db().from('runs')
+    .select('id, created_at, account, status, target_date, hour, location, court, address, message')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(1000))
 
   // runs are sorted newest first, so each account's first run is its latest
   const accounts = new Map()
@@ -49,19 +47,22 @@ export default async function Home() {
             const latest = accountRuns[0]
             const ranToday = parisDate(latest.created_at) === today
             const status = STATUS[latest.status]
+            const latestSlot = slot(latest)
             const upcoming = accountRuns.filter((r) => r.status === 'booked' && r.target_date >= today)
 
             return (
-              <article key={account} className={`card ${ranToday ? status.className : 'pending'}`}>
+              <article key={account} className={`card ${ranToday ? status.className : ''}`}>
                 <h2>{account}</h2>
                 {ranToday ? (
-                  <p className="status">{status.icon} {status.label}</p>
+                  <>
+                    <p className="status">{status.icon} {status.label}</p>
+                    {latest.status !== 'error' && latestSlot && <p>{latestSlot}</p>}
+                    {latest.address && <p className="muted">{latest.address}</p>}
+                    {latest.message && <pre className="message">{latest.message}</pre>}
+                  </>
                 ) : (
                   <p className="status">⏳ Pas encore de résultat aujourd’hui</p>
                 )}
-                {ranToday && latest.status !== 'error' && slot(latest) && <p>{slot(latest)}</p>}
-                {ranToday && latest.address && <p className="muted">{latest.address}</p>}
-                {ranToday && latest.message && <pre className="message">{latest.message}</pre>}
 
                 {upcoming.length > 0 && (
                   <>

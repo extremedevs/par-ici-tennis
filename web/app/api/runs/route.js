@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { bearerMatches } from '@/lib/auth'
 import { db, must } from '@/lib/supabase'
+import { STATUS } from '@/lib/status'
 
 export const dynamic = 'force-dynamic'
 
-const STATUSES = ['booked', 'not_found', 'error', 'dry_run']
+const STATUSES = Object.keys(STATUS)
 const text = (v, max = 500) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
 
 // Called by the booking Lambda at the end of each run (lib/tracker.js)
@@ -26,7 +27,7 @@ export async function POST(request) {
   }
   const hour = Number.parseInt(payload.hour, 10)
 
-  const run = await must(db().from('runs').insert({
+  await must(db().from('runs').insert({
     account,
     status: payload.status,
     target_date: /^\d{4}-\d{2}-\d{2}$/.test(payload.date) ? payload.date : null,
@@ -35,7 +36,7 @@ export async function POST(request) {
     court: text(payload.court),
     address: text(payload.address),
     message: text(payload.message, 2000),
-  }).select('id').single())
+  }))
 
-  return NextResponse.json({ id: run.id })
+  return new NextResponse(null, { status: 201 })
 }

@@ -5,9 +5,6 @@ export async function middleware(request) {
   if (await isValidSession(request.cookies.get(SESSION_COOKIE)?.value)) {
     return NextResponse.next()
   }
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
   return NextResponse.redirect(new URL('/login', request.url))
 }
 
