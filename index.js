@@ -161,14 +161,87 @@ const bookTennis = async () => {
 
         const submit = await page.$('#order_select_payment_form #envoyer')
         submit.evaluate(el => el.classList.remove('hide'))
+
+        // Diagnostic : on logge les appels réseau (xhr/fetch) déclenchés par le clic
+        // pour pouvoir distinguer, dans les logs Lambda, le temps réseau du temps de
+        // rendu DOM — et ainsi ajuster les timeouts ci-dessous sur de vraies données
+        // au lieu d'une marge choisie au pif.
+        const submitClickedAt = Date.now()
+        const logNetworkResponse = (response) => {
+          if (['xhr', 'fetch'].includes(response.request().resourceType())) {
+            console.log(`${dayjs().format()} - [net] ${response.request().method()} ${response.url()} -> ${response.status()} (+${Date.now() - submitClickedAt}ms)`)
+          }
+        }
+        page.on('response', logNetworkResponse)
+
         await submit.click()
 
-        await page.waitForSelector('.confirmReservation')
+        // Le site affiche parfois "Erreur dans la sélection du moyen de paiement."
+        // sur cette page alors que la réservation est en fait bien enregistrée côté
+        // serveur. On attend le premier des deux évènements (confirmation OU cette
+        // erreur connue) au lieu d'attendre bêtement 60s le seul sélecteur de succès.
+        const confirmLocator = page.locator('.confirmReservation')
+        const paymentErrorLocator = page.getByText('Erreur dans la sélection du moyen de paiement.')
 
-        // Extract reservation details
-        const address = (await (await page.$('.address')).textContent()).trim().replace(/( ){2,}/g, ' ')
-        const dateStr = (await (await page.$('.date')).textContent()).trim().replace(/( ){2,}/g, ' ')
-        const court = (await (await page.$('.court')).textContent()).trim().replace(/( ){2,}/g, ' ')
+        // Diagnostic : dump du nombre de matches / visibilité / HTML de chaque
+        // locator, pour vérifier qu'on ne tombe pas sur un doublon responsive
+        // (desktop + mobile caché) qui figerait .first() sur le mauvais élément.
+        const logLocatorMatches = async (label, locator) => {
+          const count = await locator.count()
+          console.log(`${dayjs().format()} - [debug] ${label}: ${count} élément(s)`)
+          for (let i = 0; i < count; i++) {
+            const el = locator.nth(i)
+            const visible = await el.isVisible().catch(() => 'inconnu')
+            const html = await el.evaluate(node => node.outerHTML).catch(() => '<indisponible>')
+            console.log(`${dayjs().format()} - [debug] ${label}#${i} visible=${visible} html=${html}`)
+          }
+        }
+
+        try {
+          await confirmLocator.or(paymentErrorLocator).first().waitFor({ timeout: 20000 })
+          console.log(`${dayjs().format()} - [net] DOM résolu +${Date.now() - submitClickedAt}ms après le clic`)
+        } catch {
+          // Ni l'un ni l'autre après 20s : on inspecte l'état réel du DOM avant de
+          // retomber sur l'ancien comportement (jusqu'à 20s de plus).
+          await logLocatorMatches('paymentErrorLocator (timeout initial)', paymentErrorLocator)
+          await logLocatorMatches('confirmLocator (timeout initial)', confirmLocator)
+          await page.waitForSelector('.confirmReservation', { timeout: 20000 })
+        } finally {
+          page.off('response', logNetworkResponse)
+        }
+
+        let address, dateStr, court
+        if (await confirmLocator.isVisible()) {
+          // Extract reservation details
+          address = (await (await page.$('.address')).textContent()).trim().replace(/( ){2,}/g, ' ')
+          dateStr = (await (await page.$('.date')).textContent()).trim().replace(/( ){2,}/g, ' ')
+          court = (await (await page.$('.court')).textContent()).trim().replace(/( ){2,}/g, ' ')
+        } else {
+          console.log(`${dayjs().format()} - Erreur d'affichage du paiement, vérification via "Ma réservation"...`)
+          await logLocatorMatches('paymentErrorLocator (avant vérification)', paymentErrorLocator)
+
+          // Le site affiche parfois cette erreur alors que la réservation est bien
+          // enregistrée côté serveur. On vérifie via la page de profil qui liste la
+          // réservation active, plutôt que de se fier à cette page de paiement.
+          await page.goto('https://tennis.paris.fr/tennis/jsp/site/Portal.jsp?page=profil&view=ma_reservation')
+
+          const cancelButton = await page.$('#annuler')
+          if (!cancelButton) {
+            throw new Error('Erreur de paiement et aucune réservation active trouvée : réservation probablement échouée.')
+          }
+
+          const tennisHours = (await (await page.$('.tennis-hours')).textContent()).trim().replace(/( ){2,}/g, ' ')
+          const dayMatch = tennisHours.match(/(\d{1,2})\s+\w+\s+(\d{4})/)
+          const matchesExpectedDate = dayMatch && Number(dayMatch[1]) === date.date() && Number(dayMatch[2]) === date.year()
+          if (!matchesExpectedDate) {
+            throw new Error(`Erreur de paiement et la réservation active ("${tennisHours}") ne correspond pas à la date recherchée : réservation probablement échouée.`)
+          }
+
+          console.log(`${dayjs().format()} - Réservation confirmée via "Ma réservation" malgré l'erreur d'affichage du paiement.`)
+          address = (await (await page.$('.tennis-address')).textContent()).trim().replace(/( ){2,}/g, ' ')
+          dateStr = tennisHours
+          court = (await (await page.$('.tennis-court')).textContent()).trim().replace(/( ){2,}/g, ' ')
+        }
 
         console.log(`${dayjs().format()} - Réservation faite : ${address}`)
         console.log(`pour le ${dateStr}`)
