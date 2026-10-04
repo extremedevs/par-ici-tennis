@@ -2,9 +2,11 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { SESSION_COOKIE } from '@/lib/auth'
+import { ADMIN_COOKIE, SESSION_COOKIE } from '@/lib/auth'
 
 export async function logout() {
-  (await cookies()).delete(SESSION_COOKIE)
+  const store = await cookies()
+  store.delete(SESSION_COOKIE)
+  store.delete(ADMIN_COOKIE)
   redirect('/login')
 }

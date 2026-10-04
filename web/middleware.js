@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
-import { SESSION_COOKIE, isValidSession } from '@/lib/auth'
+import { hasRole } from '@/lib/auth'
 
 export async function middleware(request) {
-  if (await isValidSession(request.cookies.get(SESSION_COOKIE)?.value)) {
+  const isAdmin = await hasRole(request.cookies, 'admin')
+
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    return isAdmin ? NextResponse.next() : NextResponse.redirect(new URL('/login?admin=1', request.url))
+  }
+  if (isAdmin || await hasRole(request.cookies, 'viewer')) {
     return NextResponse.next()
   }
   return NextResponse.redirect(new URL('/login', request.url))

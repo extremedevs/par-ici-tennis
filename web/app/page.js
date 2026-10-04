@@ -1,4 +1,7 @@
+import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { db, must } from '@/lib/supabase'
+import { hasRole } from '@/lib/auth'
 import { formatDate, formatDateTime, parisDate } from '@/lib/dates'
 import { STATUS } from '@/lib/status'
 import { logout } from './actions'
@@ -16,6 +19,7 @@ function slot(run) {
 
 export default async function Home() {
   const today = parisDate()
+  const isAdmin = await hasRole(await cookies(), 'admin')
   const since = new Date(Date.now() - 30 * 86400000).toISOString()
   const runs = await must(db().from('runs')
     .select('id, created_at, account, status, target_date, hour, location, court, address, message')
@@ -34,7 +38,10 @@ export default async function Home() {
     <>
       <header className="topbar">
         <span className="brand">🎾 Par ici tennis</span>
-        <form action={logout}><button type="submit" className="link">Déconnexion</button></form>
+        <nav className="row">
+          {isAdmin && <Link href="/admin">Admin</Link>}
+          <form action={logout}><button type="submit" className="link">Déconnexion</button></form>
+        </nav>
       </header>
       <main className="container">
         <h1>Résultats du {formatDate(today)}</h1>

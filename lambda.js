@@ -1,4 +1,5 @@
 import { bookTennis } from './index.js'
+import { useAccount } from './staticFiles.js'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
 import timezone from 'dayjs/plugin/timezone.js'
@@ -27,6 +28,9 @@ export const handler = async (event = {}) => {
   // Ecrire dans /tmp (stockage éphémère Lambda)
   process.env.OUTPUT_DIR = process.env.OUTPUT_DIR ?? '/tmp'
   process.env.IMG_DIR = process.env.IMG_DIR ?? '/tmp'
+
+  // Un planning par compte : charger sa config avant d'attendre 8h00
+  if (event.account) await useAccount(event.account)
 
   // Attendre 8h00 pile (heure Paris) — Lambda schedulée à 7h59
   await waitUntil8AM()
