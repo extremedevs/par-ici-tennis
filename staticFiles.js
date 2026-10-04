@@ -7,8 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname  = path.dirname(__filename)
 
 // --- 1) Charger depuis SSM Parameter Store si demandé ---
-async function loadConfigFromSSM() {
-  const name = process.env.CONFIG_SSM_PARAM // ex: /par-ici-tennis/config
+async function loadConfigFromSSM(name = process.env.CONFIG_SSM_PARAM) { // ex: /par-ici-tennis/config
   if (!name) return null
   try {
     const { SSMClient, GetParameterCommand } = await import('@aws-sdk/client-ssm')
@@ -43,3 +42,13 @@ let fileConfig = await loadConfigFromSSM()
 if (!fileConfig) fileConfig = loadConfigFromFile() || {}
 
 export const config = {...fileConfig};
+
+// --- 3) Config d'un compte (invocation EventBridge avec { "account": "<id>" }) ---
+// Remplace la config en place : index.js et lib/ lisent le même objet
+export async function useAccount(id) {
+  const prefix = process.env.ACCOUNTS_SSM_PREFIX || '/par-ici-tennis/accounts/'
+  const accountConfig = await loadConfigFromSSM(`${prefix}${id}`)
+  if (!accountConfig) throw new Error(`Config introuvable pour le compte ${id}`)
+  for (const key of Object.keys(config)) delete config[key]
+  Object.assign(config, { name: id }, accountConfig)
+}

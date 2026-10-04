@@ -49,6 +49,48 @@ Payload envoyé par [`lib/tracker.js`](../lib/tracker.js) :
 
 `status` vaut `booked`, `not_found`, `error` ou `dry_run`.
 
+## 4. Admin multi-comptes (`/admin`)
+
+1 compte tennis.paris.fr = 1 réservation possible par jour. Chaque compte est :
+- un paramètre SSM **SecureString** `/par-ici-tennis/accounts/<id>` qui contient son `config.json` (identifiants, lieux, heures, joueurs, ntfy) ;
+- un planning EventBridge `account-<id>` (groupe `par-ici-tennis`) qui appelle **la même Lambda** à 7h59 avec `{ "account": "<id>" }`.
+
+Une seule Lambda pour tous les comptes : le coût Lambda dépend du temps d'exécution, pas du nombre de fonctions, et les plannings lancent les comptes en parallèle à 8h00.
+
+L'admin crée, modifie, met en pause et supprime les comptes. Le mot de passe tennis.paris.fr n'est jamais réaffiché (champ vide = inchangé). On choisit les **jours de jeu** : la Lambda tourne le lendemain du jour choisi, une semaine avant (réservation à J+6).
+
+### Mise en place (Git Bash)
+
+```sh
+# 1. Groupe de plannings
+MSYS_NO_PATHCONV=1 aws scheduler create-schedule-group --name par-ici-tennis --region eu-west-3
+
+# 2. Utilisateur IAM pour Vercel, limité aux comptes et plannings par-ici-tennis
+aws iam create-user --user-name par-ici-tennis-vercel
+MSYS_NO_PATHCONV=1 aws iam put-user-policy --user-name par-ici-tennis-vercel \
+  --policy-name par-ici-tennis-admin --policy-document file://web/aws/vercel-admin-policy.json
+aws iam create-access-key --user-name par-ici-tennis-vercel   # → PIT_AWS_ACCESS_KEY_ID / PIT_AWS_SECRET_ACCESS_KEY
+```
+
+3. Variables Vercel : `ADMIN_PASSWORD`, `PIT_AWS_ACCESS_KEY_ID`, `PIT_AWS_SECRET_ACCESS_KEY`, `LAMBDA_ARN`, `SCHEDULER_ROLE_ARN` (voir [`.env.example`](.env.example)), puis redéployer.
+4. Redéployer la Lambda (rebuild + push ECR + `update-function-code`) pour qu'elle comprenne `{ "account": "<id>" }`. Le rôle Lambda lit déjà `/par-ici-tennis/*`.
+
+### Migrer le compte existant
+
+```sh
+MSYS_NO_PATHCONV=1 aws ssm get-parameter --name /par-ici-tennis/config --with-decryption \
+  --query Parameter.Value --output text --region eu-west-3 > config-jack.json
+MSYS_NO_PATHCONV=1 aws ssm put-parameter --name /par-ici-tennis/accounts/jack --type SecureString \
+  --value file://config-jack.json --region eu-west-3
+rm config-jack.json
+```
+
+Puis dans `/admin` → Modifier `jack` : cocher les jours de jeu et enregistrer (crée le planning). Enfin supprimer l'ancien planning pour éviter une double réservation :
+
+```sh
+aws scheduler delete-schedule --name par-ici-tennis-everyday --region eu-west-3
+```
+
 ## Développement local
 
 ```sh

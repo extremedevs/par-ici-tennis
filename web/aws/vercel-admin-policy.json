@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AccountsConfig",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParametersByPath", "ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"],
+      "Resource": [
+        "arn:aws:ssm:eu-west-3:635936555914:parameter/par-ici-tennis/accounts",
+        "arn:aws:ssm:eu-west-3:635936555914:parameter/par-ici-tennis/accounts/*"
+      ]
+    },
+    {
+      "Sid": "AccountSchedules",
+      "Effect": "Allow",
+      "Action": ["scheduler:GetSchedule", "scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:DeleteSchedule"],
+      "Resource": "arn:aws:scheduler:eu-west-3:635936555914:schedule/par-ici-tennis/*"
+    },
+    {
+      "Sid": "PassSchedulerRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::635936555914:role/par-ici-tennis-scheduler-role"
+    }
+  ]
+}
